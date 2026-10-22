@@ -1,0 +1,382 @@
+
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f3f6ff">
+  <title>EduCenter — O‘quv markazi</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <div class="background-shape shape-one"></div>
+  <div class="background-shape shape-two"></div>
+
+  <div class="app-layout">
+    <aside class="sidebar glass">
+      <a class="brand" href="#" onclick="showPage('dashboard'); return false;">
+        <span class="brand-icon">🎓</span>
+        <span>
+          <strong>EduCenter</strong>
+          <small>Ta’lim boshqaruvi</small>
+        </span>
+      </a>
+
+      <div class="menu-label">ASOSIY MENYU</div>
+      <nav class="navigation">
+        <button class="nav-link active" data-page="dashboard" onclick="showPage('dashboard')">
+          <span>▦</span> Bosh sahifa
+        </button>
+        <button class="nav-link" data-page="students" onclick="showPage('students')">
+          <span>♙</span> O‘quvchilar
+        </button>
+        <button class="nav-link" data-page="schedule" onclick="showPage('schedule')">
+          <span>▦</span> Dars jadvali
+        </button>
+        <button class="nav-link" data-page="groups" onclick="showPage('groups')">
+          <span>◫</span> Guruhlar va kurslar
+        </button>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <div class="help-card">
+          <span class="help-icon">✨</span>
+          <strong>Ta’limni boshqaring</strong>
+          <p>Barcha ma’lumotlaringiz bir joyda.</p>
+        </div>
+        <div class="connection-status">
+          <span class="status-dot"></span>
+          <span id="connectionText">Server tekshirilmoqda...</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">O‘QUV MARKAZI BOSHQARUVI</p>
+          <h1 id="pageTitle">Bosh sahifa</h1>
+          <p class="subtitle" id="pageSubtitle">Markazingiz faoliyatini bir joyda kuzating.</p>
+        </div>
+        <div class="topbar-actions">
+          <div class="date-pill"><span>📅</span> <span id="todayDate"></span></div>
+          <div class="avatar">E</div>
+        </div>
+      </header>
+
+      <!-- BOSH SAHIFA -->
+      <section id="dashboard" class="page">
+        <div class="welcome-banner">
+          <div class="welcome-copy">
+            <span class="welcome-tag">✦ Xush kelibsiz!</span>
+            <h2>Ta’lim kelajagini<br>birgalikda yarating.</h2>
+            <p>O‘quvchilar, kurslar va darslarni qulay boshqaring.</p>
+            <button class="button button-light" onclick="showPage('students')">
+              O‘quvchilarni ko‘rish <span>→</span>
+            </button>
+          </div>
+          <div class="welcome-art" aria-hidden="true">
+            <div class="art-orbit orbit-one"></div>
+            <div class="art-orbit orbit-two"></div>
+            <div class="art-book">📚</div>
+            <div class="floating-bubble bubble-one">✦</div>
+            <div class="floating-bubble bubble-two">✎</div>
+            <div class="floating-bubble bubble-three">✓</div>
+          </div>
+        </div>
+
+        <div class="section-heading">
+          <div>
+            <h2>Umumiy ko‘rsatkichlar</h2>
+            <p>Markazingiz haqidagi joriy ma’lumotlar</p>
+          </div>
+          <button class="button button-outline" onclick="refreshData()">↻ Yangilash</button>
+        </div>
+
+        <div class="stats-grid">
+          <article class="stat-card glass">
+            <div class="stat-top">
+              <span class="stat-icon icon-purple">♙</span>
+              <span class="stat-label">O‘quvchilar</span>
+            </div>
+            <strong class="stat-number" id="studentCount">—</strong>
+            <span class="stat-foot">Jami ro‘yxatdagi o‘quvchilar</span>
+            <div class="stat-decoration decoration-purple"></div>
+          </article>
+
+          <article class="stat-card glass">
+            <div class="stat-top">
+              <span class="stat-icon icon-blue">♧</span>
+              <span class="stat-label">O‘qituvchilar</span>
+            </div>
+            <strong class="stat-number" id="teacherCount">—</strong>
+            <span class="stat-foot">Jami o‘qituvchilar</span>
+            <div class="stat-decoration decoration-blue"></div>
+          </article>
+
+          <article class="stat-card glass">
+            <div class="stat-top">
+              <span class="stat-icon icon-orange">◫</span>
+              <span class="stat-label">Guruhlar</span>
+            </div>
+            <strong class="stat-number" id="groupCount">—</strong>
+            <span class="stat-foot">Jadvaldagi noyob guruhlar</span>
+            <div class="stat-decoration decoration-orange"></div>
+          </article>
+
+          <article class="stat-card glass">
+            <div class="stat-top">
+              <span class="stat-icon icon-green">▦</span>
+              <span class="stat-label">Darslar</span>
+            </div>
+            <strong class="stat-number" id="scheduleCount">—</strong>
+            <span class="stat-foot">Jadvaldagi darslar soni</span>
+            <div class="stat-decoration decoration-green"></div>
+          </article>
+        </div>
+
+        <div class="dashboard-grid">
+          <article class="panel glass">
+            <div class="panel-heading">
+              <div>
+                <h2>Kurslar statistikasi</h2>
+                <p>O‘quvchilar soni bo‘yicha</p>
+              </div>
+              <span class="panel-emoji">📊</span>
+            </div>
+            <div id="courseChart" class="chart-list">
+              <p class="empty-state">Ma’lumotlar yuklanmoqda...</p>
+            </div>
+          </article>
+
+          <article class="panel glass">
+            <div class="panel-heading">
+              <div>
+                <h2>Tezkor amallar</h2>
+                <p>Kerakli bo‘limga tez o‘ting</p>
+              </div>
+              <span class="panel-emoji">⚡</span>
+            </div>
+            <div class="quick-actions">
+              <button class="quick-action" onclick="showPage('students')">
+                <span class="quick-icon icon-purple">＋</span>
+                <span><strong>O‘quvchi qo‘shish</strong><small>Yangi o‘quvchini ro‘yxatga olish</small></span>
+                <span class="quick-arrow">→</span>
+              </button>
+              <button class="quick-action" onclick="showPage('schedule')">
+                <span class="quick-icon icon-blue">▦</span>
+                <span><strong>Dars jadvali</strong><small>Darslarni rejalashtirish</small></span>
+                <span class="quick-arrow">→</span>
+              </button>
+              <button class="quick-action" onclick="showPage('groups')">
+                <span class="quick-icon icon-orange">◫</span>
+                <span><strong>Guruh va kurslar</strong><small>Mavjud kurslarni ko‘rish</small></span>
+                <span class="quick-arrow">→</span>
+              </button>
+            </div>
+          </article>
+        </div>
+
+        <article class="panel glass">
+          <div class="panel-heading">
+            <div>
+              <h2>Oxirgi qo‘shilgan o‘quvchilar</h2>
+              <p>O‘quvchilar ro‘yxatidan</p>
+            </div>
+            <button class="text-button" onclick="showPage('students')">Barchasi →</button>
+          </div>
+          <div id="recentStudents" class="recent-list">
+            <p class="empty-state">Ma’lumotlar yuklanmoqda...</p>
+          </div>
+        </article>
+      </section>
+
+      <!-- O‘QUVCHILAR -->
+      <section id="students" class="page" hidden>
+        <div class="page-intro">
+          <div>
+            <h2>O‘quvchilar boshqaruvi</h2>
+            <p>O‘quvchilarni qo‘shing, qidiring va ma’lumotlarini boshqaring.</p>
+          </div>
+          <span class="intro-icon">🎓</span>
+        </div>
+
+        <article class="panel glass">
+          <div class="panel-heading">
+            <div>
+              <h2>Yangi o‘quvchi</h2>
+              <p>Kerakli ma’lumotlarni kiriting</p>
+            </div>
+            <span class="panel-emoji">✍️</span>
+          </div>
+          <form id="studentForm" class="form-grid">
+            <label>Ism va familiya
+              <input id="studentName" placeholder="Masalan, Ali Valiyev" required>
+            </label>
+            <label>Telefon raqami
+              <input id="studentPhone" type="tel" placeholder="+998 90 123 45 67">
+            </label>
+            <label>Kurs nomi
+              <input id="studentCourse" placeholder="Masalan, Ingliz tili">
+            </label>
+            <div class="form-submit">
+              <button class="button button-primary" type="submit">＋ O‘quvchi qo‘shish</button>
+            </div>
+          </form>
+          <p id="studentMessage" class="message" role="status"></p>
+        </article>
+
+        <article class="panel glass">
+          <div class="panel-heading">
+            <div>
+              <h2>O‘quvchilar ro‘yxati</h2>
+              <p id="studentListSubtitle">Barcha o‘quvchilar</p>
+            </div>
+            <span class="count-badge" id="studentListCount">0 ta</span>
+          </div>
+          <div class="search-row">
+            <span>⌕</span>
+            <input id="studentSearch" placeholder="Ism, telefon yoki kurs bo‘yicha qidirish...">
+          </div>
+          <div id="studentList" class="student-grid">
+            <p class="empty-state">Ma’lumotlar yuklanmoqda...</p>
+          </div>
+        </article>
+      </section>
+
+      <!-- DARS JADVALI -->
+      <section id="schedule" class="page" hidden>
+        <div class="page-intro">
+          <div>
+            <h2>Dars jadvali</h2>
+            <p>Darslarni kun, vaqt, guruh va o‘qituvchi bo‘yicha rejalashtiring.</p>
+          </div>
+          <span class="intro-icon">📅</span>
+        </div>
+
+        <article class="panel glass">
+          <div class="panel-heading">
+            <div>
+              <h2>Yangi dars qo‘shish</h2>
+              <p>Dars ma’lumotlarini to‘ldiring</p>
+            </div>
+            <span class="panel-emoji">✏️</span>
+          </div>
+          <form id="scheduleForm" class="form-grid">
+            <label>Dars nomi
+              <input id="lesson" placeholder="Masalan, Ingliz tili" required>
+            </label>
+            <label>Guruh nomi
+              <input id="scheduleGroup" placeholder="Masalan, English A1" required>
+            </label>
+            <label>O‘qituvchi
+              <input id="scheduleTeacher" placeholder="O‘qituvchi ismi" required>
+            </label>
+            <label>Hafta kuni
+              <select id="scheduleDay" required>
+                <option value="">Kunni tanlang</option>
+                <option>Dushanba</option>
+                <option>Seshanba</option>
+                <option>Chorshanba</option>
+                <option>Payshanba</option>
+                <option>Juma</option>
+                <option>Shanba</option>
+                <option>Yakshanba</option>
+              </select>
+            </label>
+            <label>Boshlanish vaqti
+              <input id="startTime" type="time" required>
+            </label>
+            <label>Tugash vaqti
+              <input id="endTime" type="time" required>
+            </label>
+            <label>Xona raqami
+              <input id="room" placeholder="Masalan, 203">
+            </label>
+            <div class="form-submit">
+              <button class="button button-primary" type="submit">＋ Darsni saqlash</button>
+            </div>
+          </form>
+          <p id="scheduleMessage" class="message" role="status"></p>
+        </article>
+
+        <article class="panel glass">
+          <div class="panel-heading">
+            <div>
+              <h2>Haftalik darslar</h2>
+              <p>Saqlangan darslar ro‘yxati</p>
+            </div>
+            <span class="count-badge" id="scheduleListCount">0 ta</span>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Dars</th>
+                  <th>Guruh</th>
+                  <th>O‘qituvchi</th>
+                  <th>Kun</th>
+                  <th>Vaqt</th>
+                  <th>Xona</th>
+                  <th>Amal</th>
+                </tr>
+              </thead>
+              <tbody id="scheduleList">
+                <tr><td colspan="7" class="empty-state">Jadval yuklanmoqda...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <!-- GURUHLAR VA KURSLAR -->
+      <section id="groups" class="page" hidden>
+        <div class="page-intro">
+          <div>
+            <h2>Guruhlar va kurslar</h2>
+            <p>Jadval va o‘quvchilar ro‘yxatidagi guruhlar hamda kurslarni ko‘ring.</p>
+          </div>
+          <span class="intro-icon">📚</span>
+        </div>
+
+        <div class="stats-grid compact-stats">
+          <article class="stat-card glass">
+            <div class="stat-top"><span class="stat-icon icon-orange">◫</span><span class="stat-label">Guruhlar</span></div>
+            <strong class="stat-number" id="groupsPageCount">0</strong>
+            <span class="stat-foot">Jadvaldan aniqlangan</span>
+          </article>
+          <article class="stat-card glass">
+            <div class="stat-top"><span class="stat-icon icon-purple">▤</span><span class="stat-label">Kurslar</span></div>
+            <strong class="stat-number" id="coursesPageCount">0</strong>
+            <span class="stat-foot">O‘quvchilar ro‘yxatidan</span>
+          </article>
+        </div>
+
+        <div class="dashboard-grid">
+          <article class="panel glass">
+            <div class="panel-heading">
+              <div><h2>Mavjud guruhlar</h2><p>Dars jadvalidagi guruhlar</p></div>
+              <span class="panel-emoji">👥</span>
+            </div>
+            <div id="groupList" class="entity-list"></div>
+          </article>
+          <article class="panel glass">
+            <div class="panel-heading">
+              <div><h2>Mavjud kurslar</h2><p>O‘quvchilarga biriktirilgan kurslar</p></div>
+              <span class="panel-emoji">📖</span>
+            </div>
+            <div id="courseList" class="entity-list"></div>
+          </article>
+        </div>
+        <p class="hint">Guruhlar dars jadvalidan, kurslar esa o‘quvchilarning “Kurs nomi” maydonidan avtomatik yig‘iladi. Yangi guruh yaratish uchun hozircha dars jadvaliga shu guruh nomi bilan dars qo‘shing.</p>
+      </section>
+
+      <footer class="footer">
+        <span>© <span id="currentYear"></span> EduCenter</span>
+        <span>Ta’limni oson boshqaring ✨</span>
+      </footer>
+    </main>
+  </div>
+</body>
+</html>
