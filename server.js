@@ -12,19 +12,43 @@ app.use(express.static(path.join(__dirname, "public")));
 
 const client = new MongoClient(process.env.MONGODB_URI);
 let db;
+let dbReady;
 
 const allowedTypes = {
   students: ["name", "phone", "course"],
   teachers: ["name", "phone", "subject"]
 };
 
-function collectionFor(type) {
+async function ensureDb() {
+  if (db) return db;
+
+  if (!process.env.MONGODB_URI) {
+    const error = new Error(".env faylida MONGODB_URI ko‘rsatilmagan");
+    error.status = 500;
+    throw error;
+  }
+
+  if (!dbReady) {
+    dbReady = (async () => {
+      await client.connect();
+      db = client.db(process.env.DB_NAME || "oquv_markazi");
+      await db.command({ ping: 1 });
+      return db;
+    })();
+  }
+
+  return dbReady;
+}
+
+async function collectionFor(type) {
   if (!allowedTypes[type]) {
     const error = new Error("Noto‘g‘ri bo‘lim");
     error.status = 404;
     throw error;
   }
-  return db.collection(type);
+
+  const currentDb = await ensureDb();
+  return currentDb.collection(type);
 }
 
 function cleanInput(type, body) {
@@ -74,7 +98,8 @@ function parseId(id) {
 // Barcha o‘quvchilar yoki o‘qituvchilar
 app.get("/api/:type", async (req, res, next) => {
   try {
-    const items = await collectionFor(req.params.type)
+    const collection = await collectionFor(req.params.type);
+    const items = await collection
       .find({})
       .sort({ name: 1 })
       .toArray();
@@ -90,7 +115,8 @@ app.post("/api/:type", async (req, res, next) => {
   try {
     const type = req.params.type;
     const item = cleanInput(type, req.body);
-    const result = await collectionFor(type).insertOne({
+    const collection = await collectionFor(type);
+    const result = await collection.insertOne({
       ...item,
       createdAt: new Date()
     });
@@ -110,8 +136,9 @@ app.put("/api/:type/:id", async (req, res, next) => {
     const type = req.params.type;
     const id = parseId(req.params.id);
     const item = cleanInput(type, req.body);
+    const collection = await collectionFor(type);
 
-    const result = await collectionFor(type).updateOne(
+    const result = await collection.updateOne(
       { _id: id },
       { $set: item }
     );
@@ -130,7 +157,8 @@ app.put("/api/:type/:id", async (req, res, next) => {
 app.delete("/api/:type/:id", async (req, res, next) => {
   try {
     const id = parseId(req.params.id);
-    const result = await collectionFor(req.params.type).deleteOne({ _id: id });
+    const collection = await collectionFor(req.params.type);
+    const result = await collection.deleteOne({ _id: id });
 
     if (!result.deletedCount) {
       return res.status(404).json({ error: "Ma’lumot topilmadi" });
@@ -151,14 +179,7 @@ app.use((error, req, res, next) => {
 });
 
 async function start() {
-  if (!process.env.MONGODB_URI) {
-    throw new Error(".env faylida MONGODB_URI ko‘rsatilmagan");
-  }
-
-  await client.connect();
-  db = client.db(process.env.DB_NAME || "oquv_markazi");
-  await db.command({ ping: 1 });
-
+  await ensureDb();
   app.listen(PORT, () => {
     console.log(`Dastur ishga tushdi: http://localhost:${PORT}`);
     console.log("MongoDB bilan aloqa o‘rnatildi.");
@@ -168,7 +189,8 @@ async function start() {
 // Dars jadvalini ko‘rish
 app.get('/api/schedules', async (req, res) => {
   try {
-    const schedules = await db.collection('schedules')
+    const currentDb = await ensureDb();
+    const schedules = await currentDb.collection('schedules')
       .find({})
       .sort({ day: 1, startTime: 1 })
       .toArray();
@@ -194,7 +216,8 @@ app.post('/api/schedules', async (req, res) => {
       });
     }
 
-    const result = await db.collection('schedules').insertOne({
+    const currentDb = await ensureDb();
+    const result = await currentDb.collection('schedules').insertOne({
       lesson, group, teacher, day, startTime, endTime,
       room: room || '',
       createdAt: new Date()
@@ -218,7 +241,8 @@ app.delete('/api/schedules/:id', async (req, res) => {
       return res.status(400).json({ message: 'Dars ID noto‘g‘ri' });
     }
 
-    const result = await db.collection('schedules').deleteOne({
+    const currentDb = await ensureDb();
+    const result = await currentDb.collection('schedules').deleteOne({
       _id: new ObjectId(req.params.id)
     });
 
@@ -232,15 +256,19 @@ app.delete('/api/schedules/:id', async (req, res) => {
   }
 });
 
-start().catch(error => {
-  console.error("Ishga tushirish xatosi:", error.message);
-  process.exit(1);
-});
+if (require.main === module) {
+  start().catch(error => {
+    console.error("Ishga tushirish xatosi:", error.message);
+    process.exit(1);
+  });
 
-async function shutdown() {
-  await client.close();
-  process.exit(0);
+  async function shutdown() {
+    await client.close();
+    process.exit(0);
+  }
+
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
 }
 
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
+module.exports = app;
