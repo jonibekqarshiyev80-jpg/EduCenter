@@ -9,6 +9,7 @@ const DAY_ORDER = [
 const PAGE_INFO = {
   dashboard: ['Bosh sahifa', 'Markazingiz faoliyatini bir joyda kuzating.'],
   students: ['O‘quvchilar', 'O‘quvchilarni qo‘shing va boshqaring.'],
+  teachers: ['O‘qituvchilar', 'O‘qituvchilarni qo‘shing va boshqaring.'],
   schedule: ['Dars jadvali', 'Darslarni qulay rejalashtiring.'],
   groups: ['Guruhlar va kurslar', 'Kurslar va guruhlarni ko‘rib chiqing.']
 };
@@ -19,6 +20,7 @@ let schedules = [];
 let studentLoadFailed = false;
 let teacherLoadFailed = false;
 let scheduleLoadFailed = false;
+let teacherSubmitInProgress = false;
 
 function showPage(pageId) {
   if (!PAGE_INFO[pageId]) return;
@@ -61,7 +63,9 @@ async function apiRequest(url, options = {}) {
     : null;
 
   if (!response.ok) {
-    throw new Error(data?.message || `Server xatosi: ${response.status}`);
+    throw new Error(
+      data?.message || data?.error || `Server xatosi: ${response.status}`
+    );
   }
 
   return data;
@@ -379,6 +383,167 @@ function renderStudents() {
   });
 }
 
+function renderTeachers() {
+  const container = $('#teacherList');
+  container.replaceChildren();
+
+  $('#teacherListCount').textContent =
+    teacherLoadFailed ? 'Xatolik' : `${teachers.length} ta`;
+
+  if (teacherLoadFailed) {
+    container.className = 'student-grid empty-state';
+    container.textContent = 'O‘qituvchilarni yuklab bo‘lmadi. Server va API sozlamalarini tekshiring.';
+    return;
+  }
+
+  container.className = 'student-grid';
+
+  const query = $('#teacherSearch').value.trim().toLocaleLowerCase('uz');
+  const filtered = teachers.filter(teacher =>
+    [teacher.name, teacher.phone, teacher.subject]
+      .join(' ')
+      .toLocaleLowerCase('uz')
+      .includes(query)
+  );
+
+  $('#teacherListSubtitle').textContent =
+    query ? 'Qidiruv natijalari' : 'Barcha o‘qituvchilar';
+
+  if (!filtered.length) {
+    container.className = 'student-grid empty-state';
+    container.textContent = query
+      ? 'Qidiruv bo‘yicha o‘qituvchi topilmadi.'
+      : 'Hozircha o‘qituvchilar yo‘q.';
+    return;
+  }
+
+  filtered.forEach(teacher => {
+    const card = document.createElement('article');
+    card.className = 'student-card';
+
+    const head = document.createElement('div');
+    head.className = 'student-card-head';
+
+    const avatar = document.createElement('div');
+    avatar.className = 'person-avatar';
+    avatar.textContent = escapeInitial(teacher.name);
+
+    const info = document.createElement('div');
+    const name = document.createElement('h3');
+    name.textContent = teacher.name || 'Ism kiritilmagan';
+
+    const phone = document.createElement('p');
+    phone.textContent = teacher.phone || 'Telefon ko‘rsatilmagan';
+
+    info.append(name, phone);
+    head.append(avatar, info);
+
+    const subject = document.createElement('span');
+    subject.className = 'course-chip';
+    subject.textContent = `📚 ${teacher.subject || 'Fan ko‘rsatilmagan'}`;
+
+    const actions = document.createElement('div');
+    actions.className = 'card-actions';
+
+    const edit = document.createElement('button');
+    edit.type = 'button';
+    edit.className = 'text-button';
+    edit.textContent = 'Tahrirlash';
+
+    edit.addEventListener('click', async () => {
+      const nameValue = prompt('O‘qituvchining ismi:', teacher.name || '');
+      if (nameValue === null) return;
+
+      const phoneValue = prompt('Telefon raqami:', teacher.phone || '');
+      if (phoneValue === null) return;
+
+      const subjectValue = prompt('Fani:', teacher.subject || '');
+      if (subjectValue === null) return;
+
+      const updatedTeacher = {
+        name: nameValue.trim(),
+        phone: phoneValue.trim(),
+        subject: subjectValue.trim()
+      };
+
+      if (!updatedTeacher.name) {
+        setMessage('#teacherMessage', 'O‘qituvchi ismini kiriting.', true);
+        return;
+      }
+
+      try {
+        await apiRequest(`/api/teachers/${encodeURIComponent(getId(teacher))}`, {
+          method: 'PUT',
+          body: JSON.stringify(updatedTeacher)
+        });
+        setMessage('#teacherMessage', 'O‘qituvchi ma’lumotlari yangilandi.');
+        await refreshData();
+      } catch (error) {
+        setMessage('#teacherMessage', error.message, true);
+      }
+    });
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'danger-button';
+    remove.textContent = 'O‘chirish';
+
+    remove.addEventListener('click', async () => {
+      const id = getId(teacher);
+
+      if (!id) {
+        setMessage('#teacherMessage', 'O‘qituvchining ID raqami topilmadi.', true);
+        return;
+      }
+
+      if (!confirm(`${teacher.name || 'Ushbu o‘qituvchi'}ni o‘chirmoqchimisiz?`)) {
+        return;
+      }
+
+      try {
+        await apiRequest(`/api/teachers/${encodeURIComponent(id)}`, {
+          method: 'DELETE'
+        });
+        setMessage('#teacherMessage', 'O‘qituvchi o‘chirildi.');
+        await refreshData();
+      } catch (error) {
+        setMessage('#teacherMessage', error.message, true);
+      }
+    });
+
+    actions.append(edit, remove);
+    card.append(head, subject, actions);
+    container.appendChild(card);
+  });
+}
+
+function renderScheduleTeacherOptions() {
+  const select = $('#scheduleTeacher');
+  const selectedTeacher = select.value;
+  select.replaceChildren();
+
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = teacherLoadFailed
+    ? 'O‘qituvchilarni yuklab bo‘lmadi'
+    : teachers.length
+      ? 'O‘qituvchini tanlang'
+      : 'Avval o‘qituvchi qo‘shing';
+  select.appendChild(placeholder);
+
+  const teacherNames = uniqueValues(teachers.map(teacher => teacher.name))
+    .sort((a, b) => a.localeCompare(b, 'uz'));
+
+  teacherNames.forEach(name => {
+    const option = document.createElement('option');
+    option.value = name;
+    option.textContent = name;
+    select.appendChild(option);
+  });
+
+  select.value = teacherNames.includes(selectedTeacher) ? selectedTeacher : '';
+}
+
 function renderSchedules() {
   const container = $('#scheduleList');
   container.replaceChildren();
@@ -580,12 +745,51 @@ async function refreshData() {
   renderCourseChart();
   renderRecentStudents();
   renderStudents();
+  renderTeachers();
+  renderScheduleTeacherOptions();
   renderSchedules();
   renderGroupsAndCourses();
   updateConnectionStatus();
 }
 
 $('#studentSearch').addEventListener('input', renderStudents);
+$('#teacherSearch').addEventListener('input', renderTeachers);
+
+$('#teacherForm').addEventListener('submit', async event => {
+  event.preventDefault();
+  if (teacherSubmitInProgress) return;
+
+  const submit = $('#teacherForm button[type="submit"]');
+  const teacher = {
+    name: $('#teacherName').value.trim(),
+    phone: $('#teacherPhone').value.trim(),
+    subject: $('#teacherSubject').value.trim()
+  };
+
+  if (!teacher.name) {
+    setMessage('#teacherMessage', 'O‘qituvchi ismini kiriting.', true);
+    return;
+  }
+
+  teacherSubmitInProgress = true;
+  submit.disabled = true;
+
+  try {
+    await apiRequest('/api/teachers', {
+      method: 'POST',
+      body: JSON.stringify(teacher)
+    });
+
+    $('#teacherForm').reset();
+    setMessage('#teacherMessage', 'O‘qituvchi muvaffaqiyatli qo‘shildi.');
+    await refreshData();
+  } catch (error) {
+    setMessage('#teacherMessage', error.message, true);
+  } finally {
+    teacherSubmitInProgress = false;
+    submit.disabled = false;
+  }
+});
 
 $('#studentForm').addEventListener('submit', async event => {
   event.preventDefault();

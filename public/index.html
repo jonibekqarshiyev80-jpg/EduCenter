@@ -31,6 +31,9 @@
         <button class="nav-link" data-page="students" onclick="showPage('students')">
           <span>♙</span> O‘quvchilar
         </button>
+        <button class="nav-link" data-page="teachers" onclick="showPage('teachers')">
+          <span>♧</span> O‘qituvchilar
+        </button>
         <button class="nav-link" data-page="schedule" onclick="showPage('schedule')">
           <span>▦</span> Dars jadvali
         </button>
@@ -245,6 +248,63 @@
         </article>
       </section>
 
+
+        <!-- O‘QITUVCHILAR -->
+<section id="teachers" class="page" hidden>
+  <div class="page-intro">
+    <div>
+      <h2>O‘qituvchilar boshqaruvi</h2>
+      <p>O‘qituvchilarni qo‘shing, qidiring va ma’lumotlarini boshqaring.</p>
+    </div>
+    <span class="intro-icon">♧</span>
+  </div>
+
+  <article class="panel glass">
+    <div class="panel-heading">
+      <div>
+        <h2>Yangi o‘qituvchi</h2>
+        <p>Kerakli ma’lumotlarni kiriting</p>
+      </div>
+    </div>
+
+    <form id="teacherForm" class="form-grid">
+      <label>Ism va familiya
+        <input id="teacherName" placeholder="Masalan, Ali Valiyev" required>
+      </label>
+      <label>Telefon raqami
+        <input id="teacherPhone" type="tel" placeholder="+998 90 123 45 67">
+      </label>
+      <label>Fan
+        <input id="teacherSubject" placeholder="Masalan, Ingliz tili">
+      </label>
+      <div class="form-submit">
+        <button class="button button-primary" type="submit">＋ O‘qituvchi qo‘shish</button>
+      </div>
+    </form>
+
+    <p id="teacherMessage" class="message" role="status"></p>
+  </article>
+
+  <article class="panel glass">
+    <div class="panel-heading">
+      <div>
+        <h2>O‘qituvchilar ro‘yxati</h2>
+        <p id="teacherListSubtitle">Barcha o‘qituvchilar</p>
+      </div>
+      <span class="count-badge" id="teacherListCount">0 ta</span>
+    </div>
+
+    <div class="search-row">
+      <span>⌕</span>
+      <input id="teacherSearch" placeholder="Ism, telefon yoki fan bo‘yicha qidirish...">
+    </div>
+
+    <div id="teacherList" class="student-grid">
+      <p class="empty-state">Ma’lumotlar yuklanmoqda...</p>
+    </div>
+  </article>
+</section>
+
       <!-- DARS JADVALI -->
       <section id="schedule" class="page" hidden>
         <div class="page-intro">
@@ -271,7 +331,9 @@
               <input id="scheduleGroup" placeholder="Masalan, English A1" required>
             </label>
             <label>O‘qituvchi
-              <input id="scheduleTeacher" placeholder="O‘qituvchi ismi" required>
+              <select id="scheduleTeacher" required>
+                <option value="">Avval o‘qituvchi qo‘shing</option>
+              </select>
             </label>
             <label>Hafta kuni
               <select id="scheduleDay" required>
