@@ -21,9 +21,11 @@ let studentLoadFailed = false;
 let teacherLoadFailed = false;
 let scheduleLoadFailed = false;
 let teacherSubmitInProgress = false;
+let currentUser = null;
 
 function showPage(pageId) {
   if (!PAGE_INFO[pageId]) return;
+  if (currentUser && currentUser.role !== 'admin' && pageId !== 'schedule') return;
 
   document.querySelectorAll('.page').forEach((page) => {
     page.hidden = page.id !== pageId;
@@ -735,6 +737,13 @@ function createEntityCard(icon, titleText, description, targetPage) {
 }
 
 async function refreshData() {
+  if (currentUser && currentUser.role !== 'admin') {
+    await loadSchedules();
+    renderSchedules();
+    updateConnectionStatus();
+    return;
+  }
+
   await Promise.all([
     loadStudents(),
     loadTeachers(),
@@ -870,9 +879,104 @@ $('#scheduleForm').addEventListener('submit', async event => {
 });
 
 async function init() {
+  const allowedRoles = ['admin', 'teacher', 'student'];
+  if (!currentUser || !allowedRoles.includes(currentUser.role)) {
+    throw new Error('Foydalanuvchi roli aniqlanmadi.');
+  }
+
+  const isAdmin = currentUser.role === 'admin';
+  $('#loginScreen').hidden = true;
+  $('#appLayout').hidden = false;
+  $('#scheduleForm').hidden = !isAdmin;
+  $('.avatar').textContent = escapeInitial(currentUser.username);
+
+  document.querySelectorAll('.nav-link').forEach(button => {
+    button.hidden = !isAdmin && button.dataset.page !== 'schedule';
+  });
+  document.querySelectorAll('.page').forEach(page => {
+    if (!isAdmin && page.id !== 'schedule') page.hidden = true;
+  });
+
   formatDate();
-  showPage('dashboard');
+  showPage(isAdmin ? 'dashboard' : 'schedule');
   await refreshData();
 }
 
-init();
+const loginForm = $('#loginForm');
+
+loginForm.addEventListener('submit', async event => {
+  event.preventDefault();
+
+  const submitButton = loginForm.querySelector('button[type="submit"]');
+  const message = $('#loginMessage');
+
+  submitButton.disabled = true;
+  message.textContent = '';
+
+  try {
+    const response = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        username: $('#loginUsername').value.trim(),
+        password: $('#loginPassword').value
+      })
+    });
+
+    const contentType = response.headers.get('content-type') || '';
+    const data = contentType.includes('application/json')
+      ? await response.json()
+      : null;
+
+    if (!response.ok) {
+      throw new Error(
+        data?.message || data?.error || `Server xatosi: ${response.status}`
+      );
+    }
+
+    currentUser = data?.user;
+    await init();
+  } catch (error) {
+    message.textContent = error.message || 'Kirishda xatolik yuz berdi.';
+    message.style.color = '#d74d65';
+  } finally {
+    submitButton.disabled = false;
+  }
+});
+
+$('#logoutButton').addEventListener('click', async () => {
+  try {
+    await apiRequest('/api/logout', { method: 'POST' });
+    window.location.reload();
+  } catch (error) {
+    setMessage('#loginMessage', error.message, true);
+  }
+});
+
+async function restoreSession() {
+  try {
+    const response = await fetch('/api/auth/me', {
+      credentials: 'same-origin'
+    });
+    if (response.status === 401) return;
+
+    const contentType = response.headers.get('content-type') || '';
+    const data = contentType.includes('application/json')
+      ? await response.json()
+      : null;
+
+    if (!response.ok) {
+      throw new Error(
+        data?.message || data?.error || `Server xatosi: ${response.status}`
+      );
+    }
+
+    currentUser = data?.user;
+    await init();
+  } catch (error) {
+    setMessage('#loginMessage', error.message || 'Serverga ulanib bo‘lmadi.', true);
+  }
+}
+
+restoreSession();

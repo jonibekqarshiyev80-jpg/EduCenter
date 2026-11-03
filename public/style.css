@@ -85,6 +85,30 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   padding: 20px;
 }
 
+#appLayout[hidden],
+#loginScreen[hidden],
+.nav-link[hidden],
+#scheduleForm[hidden] {
+  display: none !important;
+}
+
+.login-screen {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.login-panel {
+  width: min(440px, 100%);
+  margin: 0;
+}
+
+.login-panel h1 {
+  margin-top: 0;
+  font-size: 22px;
+}
+
 .sidebar {
   position: sticky;
   top: 20px;

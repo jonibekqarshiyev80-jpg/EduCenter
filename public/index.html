@@ -12,8 +12,35 @@
 <body>
   <div class="background-shape shape-one"></div>
   <div class="background-shape shape-two"></div>
+  <main id="loginScreen" class="login-screen">
+    <section class="panel glass login-panel">
+      <h1>EduCenter’ga kirish</h1>
+      <p>Login va parolingizni kiriting.</p>
 
-  <div class="app-layout">
+      <form id="loginForm" class="form-grid">
+        <label>Login
+          <input id="loginUsername" name="username" autocomplete="username" required>
+        </label>
+
+        <label>Parol
+          <input
+            id="loginPassword"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            required
+          >
+        </label>
+
+        <div class="form-submit">
+          <button class="button button-primary" type="submit">Kirish</button>
+        </div>
+      </form>
+
+      <p id="loginMessage" class="message" role="status"></p>
+    </section>
+  </main>
+  <div class="app-layout" id="appLayout" hidden>
     <aside class="sidebar glass">
       <a class="brand" href="#" onclick="showPage('dashboard'); return false;">
         <span class="brand-icon">🎓</span>
@@ -65,6 +92,7 @@
         <div class="topbar-actions">
           <div class="date-pill"><span>📅</span> <span id="todayDate"></span></div>
           <div class="avatar">E</div>
+          <button id="logoutButton" class="button button-outline" type="button">Chiqish</button>
         </div>
       </header>
 
