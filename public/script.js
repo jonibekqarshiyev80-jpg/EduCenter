@@ -16,6 +16,7 @@ const PAGE_INFO = {
 
 let students = [];
 let teachers = [];
+let managedGroups = [];
 let schedules = [];
 let studentLoadFailed = false;
 let teacherLoadFailed = false;
@@ -128,7 +129,58 @@ async function loadTeachers() {
     console.error('O‘qituvchilarni yuklash:', error);
   }
 }
+async function loadManagedGroups() {
+  managedGroups = await apiRequest('/api/groups');
+  if (!Array.isArray(managedGroups)) {
+    throw new Error('Guruhlar ro‘yxati noto‘g‘ri.');
+  }
+}
 
+function renderGroupOptions() {
+  const teacherSelect = $('#groupTeacher');
+  const groupSelect = $('#assignGroup');
+  const studentSelect = $('#assignStudent');
+
+  teacherSelect.replaceChildren(new Option('O‘qituvchini tanlang', ''));
+  teachers.forEach(teacher => {
+    teacherSelect.add(new Option(teacher.name, getId(teacher)));
+  });
+
+  groupSelect.replaceChildren(new Option('Guruhni tanlang', ''));
+  managedGroups.forEach(group => {
+    groupSelect.add(new Option(group.name, group.id));
+  });
+
+  studentSelect.replaceChildren(new Option('O‘quvchini tanlang', ''));
+  students.filter(student => !student.groupId).forEach(student => {
+    studentSelect.add(new Option(student.name, getId(student)));
+  });
+}
+
+async function loadTeacherRoster() {
+  const roster = await apiRequest('/api/my/students');
+  const container = $('#teacherRoster');
+  container.replaceChildren();
+
+  if (!roster.length) {
+    container.textContent = 'Sizga hali o‘quvchilar biriktirilmagan.';
+    return;
+  }
+
+  roster.forEach(student => {
+    const card = document.createElement('article');
+    card.className = 'student-card';
+
+    const name = document.createElement('h3');
+    name.textContent = student.name || 'Ism ko‘rsatilmagan';
+
+    const course = document.createElement('p');
+    course.textContent = student.course || 'Kurs ko‘rsatilmagan';
+
+    card.append(name, course);
+    container.appendChild(card);
+  });
+}
 async function loadSchedules() {
   try {
     const data = await apiRequest('/api/schedules');
@@ -740,6 +792,11 @@ async function refreshData() {
   if (currentUser && currentUser.role !== 'admin') {
     await loadSchedules();
     renderSchedules();
+
+    if (currentUser.role === 'teacher') {
+      await loadTeacherRoster();
+    }
+
     updateConnectionStatus();
     return;
   }
@@ -747,10 +804,12 @@ async function refreshData() {
   await Promise.all([
     loadStudents(),
     loadTeachers(),
-    loadSchedules()
+    loadSchedules(),
+    loadManagedGroups()
   ]);
 
   renderStats();
+  renderGroupOptions();
   renderCourseChart();
   renderRecentStudents();
   renderStudents();
@@ -761,9 +820,48 @@ async function refreshData() {
   updateConnectionStatus();
 }
 
+
 $('#studentSearch').addEventListener('input', renderStudents);
 $('#teacherSearch').addEventListener('input', renderTeachers);
+$('#groupForm').addEventListener('submit', async event => {
+  event.preventDefault();
 
+  try {
+    await apiRequest('/api/groups', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: $('#groupName').value.trim(),
+        teacherId: $('#groupTeacher').value
+      })
+    });
+
+    $('#groupForm').reset();
+    setMessage('#groupMessage', 'Guruh yaratildi va o‘qituvchi biriktirildi.');
+    await refreshData();
+  } catch (error) {
+    setMessage('#groupMessage', error.message, true);
+  }
+});
+
+$('#assignStudentForm').addEventListener('submit', async event => {
+  event.preventDefault();
+
+  try {
+    await apiRequest(
+      `/api/groups/${encodeURIComponent($('#assignGroup').value)}/students`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ studentId: $('#assignStudent').value })
+      }
+    );
+
+    $('#assignStudentForm').reset();
+    setMessage('#assignMessage', 'O‘quvchi guruhga biriktirildi.');
+    await refreshData();
+  } catch (error) {
+    setMessage('#assignMessage', error.message, true);
+  }
+});
 $('#teacherForm').addEventListener('submit', async event => {
   event.preventDefault();
   if (teacherSubmitInProgress) return;
@@ -772,7 +870,9 @@ $('#teacherForm').addEventListener('submit', async event => {
   const teacher = {
     name: $('#teacherName').value.trim(),
     phone: $('#teacherPhone').value.trim(),
-    subject: $('#teacherSubject').value.trim()
+    subject: $('#teacherSubject').value.trim(),
+    username: $('#teacherUsername').value.trim(),
+    password: $('#teacherPassword').value
   };
 
   if (!teacher.name) {
@@ -803,17 +903,15 @@ $('#teacherForm').addEventListener('submit', async event => {
 $('#studentForm').addEventListener('submit', async event => {
   event.preventDefault();
 
-  const submit = $('#studentForm button[type="submit"]');
+  const form = $('#studentForm');
+  const submit = form.querySelector('button[type="submit"]');
   const student = {
     name: $('#studentName').value.trim(),
     phone: $('#studentPhone').value.trim(),
-    course: $('#studentCourse').value.trim()
+    course: $('#studentCourse').value.trim(),
+    username: $('#studentUsername').value.trim().toLowerCase(),
+    password: $('#studentPassword').value
   };
-
-  if (!student.name) {
-    setMessage('#studentMessage', 'O‘quvchi ismini kiriting.', true);
-    return;
-  }
 
   submit.disabled = true;
 
@@ -823,8 +921,8 @@ $('#studentForm').addEventListener('submit', async event => {
       body: JSON.stringify(student)
     });
 
-    $('#studentForm').reset();
-    setMessage('#studentMessage', 'O‘quvchi muvaffaqiyatli qo‘shildi.');
+    form.reset();
+    setMessage('#studentMessage', 'O‘quvchi va login akkaunti yaratildi.');
     await refreshData();
   } catch (error) {
     setMessage('#studentMessage', error.message, true);
@@ -880,6 +978,7 @@ $('#scheduleForm').addEventListener('submit', async event => {
 
 async function init() {
   const allowedRoles = ['admin', 'teacher', 'student'];
+  $('#teacherRosterPanel').hidden = currentUser.role !== 'teacher';
   if (!currentUser || !allowedRoles.includes(currentUser.role)) {
     throw new Error('Foydalanuvchi roli aniqlanmadi.');
   }

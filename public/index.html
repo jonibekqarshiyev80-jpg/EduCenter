@@ -251,6 +251,27 @@
             <label>Kurs nomi
               <input id="studentCourse" placeholder="Masalan, Ingliz tili">
             </label>
+            <label>Login
+              <input
+                id="studentUsername"
+                autocomplete="username"
+                minlength="3"
+                maxlength="32"
+                pattern="[-a-zA-Z0-9._]{3,32}"
+                title="3–32 belgi: lotin harfi, raqam, nuqta, _ yoki -"
+                required
+              >
+            </label>
+            <label>Parol
+              <input
+                id="studentPassword"
+                type="password"
+                autocomplete="new-password"
+                minlength="8"
+                maxlength="72"
+                required
+              >
+            </label>
             <div class="form-submit">
               <button class="button button-primary" type="submit">＋ O‘quvchi qo‘shish</button>
             </div>
@@ -305,6 +326,28 @@
       <label>Fan
         <input id="teacherSubject" placeholder="Masalan, Ingliz tili">
       </label>
+      <label>Login
+  <input
+    id="teacherUsername"
+    autocomplete="username"
+    minlength="3"
+    maxlength="32"
+    pattern="[-a-zA-Z0-9._]{3,32}"
+    title="3–32 belgi: lotin harfi, raqam, nuqta, _ yoki -"
+    required
+  >
+</label>
+
+<label>Parol
+  <input
+    id="teacherPassword"
+    type="password"
+    autocomplete="new-password"
+    minlength="8"
+    maxlength="72"
+    required
+  >
+</label>
       <div class="form-submit">
         <button class="button button-primary" type="submit">＋ O‘qituvchi qo‘shish</button>
       </div>
@@ -422,6 +465,50 @@
 
       <!-- GURUHLAR VA KURSLAR -->
       <section id="groups" class="page" hidden>
+        <article class="panel glass">
+  <h2>Guruh yaratish va o‘qituvchi tayinlash</h2>
+
+  <form id="groupForm" class="form-grid">
+    <label>Guruh nomi
+      <input id="groupName" required maxlength="120" placeholder="Masalan, English A1">
+    </label>
+
+    <label>O‘qituvchi
+      <select id="groupTeacher" required>
+        <option value="">O‘qituvchini tanlang</option>
+      </select>
+    </label>
+
+    <div class="form-submit">
+      <button class="button button-primary" type="submit">Guruh yaratish</button>
+    </div>
+  </form>
+  <p id="groupMessage" class="message" role="status"></p>
+</article>
+
+<article class="panel glass">
+  <h2>O‘quvchini guruhga biriktirish</h2>
+
+  <form id="assignStudentForm" class="form-grid">
+    <label>Guruh
+      <select id="assignGroup" required>
+        <option value="">Guruhni tanlang</option>
+      </select>
+    </label>
+
+    <label>O‘quvchi
+      <select id="assignStudent" required>
+        <option value="">O‘quvchini tanlang</option>
+      </select>
+    </label>
+
+    <div class="form-submit">
+      <button class="button button-primary" type="submit">Biriktirish</button>
+    </div>
+  </form>
+  <p id="assignMessage" class="message" role="status"></p>
+</article>
+        
         <div class="page-intro">
           <div>
             <h2>Guruhlar va kurslar</h2>
@@ -460,7 +547,12 @@
           </article>
         </div>
         <p class="hint">Guruhlar dars jadvalidan, kurslar esa o‘quvchilarning “Kurs nomi” maydonidan avtomatik yig‘iladi. Yangi guruh yaratish uchun hozircha dars jadvaliga shu guruh nomi bilan dars qo‘shing.</p>
+      <article id="teacherRosterPanel" class="panel glass" hidden>
+        <h2>Mening o‘quvchilarim</h2>
+        <div id="teacherRoster" class="student-grid"></div>
+      </article>
       </section>
+
 
       <footer class="footer">
         <span>© <span id="currentYear"></span> EduCenter</span>

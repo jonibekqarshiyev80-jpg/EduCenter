@@ -35,6 +35,7 @@ function signSession(user) {
   const payload = Buffer.from(JSON.stringify({
     username: user.username,
     role: user.role,
+    profileId: user.profileId || null,
     expiresAt: Date.now() + 8 * 60 * 60 * 1000
   })).toString("base64url");
   const signature = crypto
@@ -74,7 +75,11 @@ function authenticate(req, res, next) {
       return res.status(401).json({ message: "Sessiya muddati tugagan. Qayta kiring." });
     }
 
-    req.user = { username: user.username, role: user.role };
+    req.user = {
+      username: user.username,
+      role: user.role,
+      profileId: user.profileId || null
+    };
     next();
   } catch (error) {
     if (error.status) return next(error);
@@ -177,7 +182,7 @@ app.post("/api/login", async (req, res, next) => {
 
     const currentDb = await ensureDb();
     const user = await currentDb.collection("users").findOne({
-      username: username.trim()
+      username: username.trim().toLowerCase()
     });
 
     if (!user || typeof user.passwordHash !== "string" ||
@@ -197,7 +202,8 @@ app.post("/api/login", async (req, res, next) => {
     res.json({
       user: {
         username: user.username,
-        role: user.role
+        role: user.role,
+        profileId: user.profileId || null
       }
     });
   } catch (error) {
@@ -216,7 +222,120 @@ app.post("/api/logout", (req, res) => {
   );
   res.json({ message: "Tizimdan chiqildi." });
 });
+// Admin guruh yaratadi va o‘qituvchi tayinlaydi
+app.post("/api/groups", authenticate, requireRole("admin"), async (req, res, next) => {
+  try {
+    const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+    const teacherId = req.body?.teacherId;
 
+    if (!name || name.length > 120 || !/^[a-fA-F0-9]{24}$/.test(teacherId || "")) {
+      return res.status(400).json({ message: "Guruh nomi va o‘qituvchini kiriting." });
+    }
+
+    const db = await ensureDb();
+    const teacher = await db.collection("teachers").findOne({
+      _id: new ObjectId(teacherId)
+    });
+
+    if (!teacher) {
+      return res.status(404).json({ message: "O‘qituvchi topilmadi." });
+    }
+
+    const result = await db.collection("groups").insertOne({
+      name,
+      teacherId: teacher._id.toString(),
+      teacherName: teacher.name,
+      createdAt: new Date()
+    });
+
+    res.status(201).json({
+      id: result.insertedId.toString(),
+      name,
+      teacherName: teacher.name
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Admin o‘quvchini guruhga biriktiradi
+app.put("/api/groups/:groupId/students", authenticate, requireRole("admin"), async (req, res, next) => {
+  try {
+    const { groupId } = req.params;
+    const { studentId } = req.body || {};
+
+    if (!/^[a-fA-F0-9]{24}$/.test(groupId) ||
+        !/^[a-fA-F0-9]{24}$/.test(studentId || "")) {
+      return res.status(400).json({ message: "Guruh yoki o‘quvchi ID noto‘g‘ri." });
+    }
+
+    const db = await ensureDb();
+    const group = await db.collection("groups").findOne({
+      _id: new ObjectId(groupId)
+    });
+    const student = await db.collection("students").findOne({
+      _id: new ObjectId(studentId)
+    });
+
+    if (!group || !student) {
+      return res.status(404).json({ message: "Guruh yoki o‘quvchi topilmadi." });
+    }
+
+    if (student.groupId && student.groupId !== groupId) {
+      return res.status(409).json({ message: "O‘quvchi allaqachon boshqa guruhda." });
+    }
+
+    await db.collection("students").updateOne(
+      { _id: student._id },
+      { $set: { groupId } }
+    );
+
+    res.json({ message: "O‘quvchi guruhga biriktirildi." });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// O‘qituvchi o‘z guruhidagi o‘quvchilarni ko‘radi
+app.get("/api/my/students", authenticate, requireRole("teacher"), async (req, res, next) => {
+  try {
+    if (!req.user.profileId) {
+      return res.status(403).json({ message: "O‘qituvchi profili akkauntga bog‘lanmagan." });
+    }
+
+    const db = await ensureDb();
+    const groups = await db.collection("groups")
+      .find({ teacherId: req.user.profileId })
+      .toArray();
+    const groupIds = groups.map(group => group._id.toString());
+
+    const students = await db.collection("students")
+      .find({ groupId: { $in: groupIds } })
+      .project({ name: 1, phone: 1, course: 1, groupId: 1 })
+      .sort({ name: 1 })
+      .toArray();
+
+    res.json(students.map(student => ({
+      ...student,
+      id: student._id.toString()
+    })));
+  } catch (error) {
+    next(error);
+  }
+});
+app.get("/api/groups", authenticate, requireRole("admin"), async (req, res, next) => {
+  try {
+    const db = await ensureDb();
+    const groups = await db.collection("groups").find({}).sort({ name: 1 }).toArray();
+
+    res.json(groups.map(group => ({
+      ...group,
+      id: group._id.toString()
+    })));
+  } catch (error) {
+    next(error);
+  }
+});
 // Barcha o‘quvchilar yoki o‘qituvchilar
 app.get("/api/:type", authenticate, async (req, res, next) => {
   try {
@@ -244,17 +363,63 @@ app.post("/api/:type", authenticate, async (req, res, next) => {
     if (req.user.role !== "admin") {
       return res.status(403).json({ message: "Bu amal faqat admin uchun." });
     }
+    if (!allowedTypes[type]) {
+      return res.status(404).json({ message: "Noto‘g‘ri bo‘lim." });
+    }
+
     const item = cleanInput(type, req.body);
     const collection = await collectionFor(type);
-    const result = await collection.insertOne({
-      ...item,
-      createdAt: new Date()
-    });
+    const username = typeof req.body.username === "string"
+      ? req.body.username.trim().toLowerCase()
+      : "";
+    const password = req.body.password;
 
-    res.status(201).json({
-      id: result.insertedId.toString(),
-      ...item
-    });
+    if (!/^[a-z0-9._-]{3,32}$/.test(username)) {
+      return res.status(400).json({
+        message: "Login 3–32 belgi bo‘lsin; lotin harflari, raqam, nuqta, _ yoki - ishlating."
+      });
+    }
+    if (typeof password !== "string" ||
+        Buffer.byteLength(password, "utf8") < 8 ||
+        Buffer.byteLength(password, "utf8") > 72) {
+      return res.status(400).json({
+        message: "Parol 8–72 bayt oralig‘ida bo‘lishi kerak."
+      });
+    }
+
+    const currentDb = await ensureDb();
+    const users = currentDb.collection("users");
+    await users.createIndex({ username: 1 }, { unique: true });
+
+    const profileId = new ObjectId();
+    let userId;
+    try {
+      const userResult = await users.insertOne({
+        username,
+        passwordHash: await bcrypt.hash(password, 12),
+        role: type === "teachers" ? "teacher" : "student",
+        profileId: profileId.toString(),
+        createdAt: new Date()
+      });
+      userId = userResult.insertedId;
+
+      await collection.insertOne({
+        _id: profileId,
+        ...item,
+        userId: userId.toString(),
+        createdAt: new Date()
+      });
+    } catch (error) {
+      if (userId) {
+        await users.deleteOne({ _id: userId });
+      }
+      if (error.code === 11000) {
+        return res.status(409).json({ message: "Bu login band. Boshqa login tanlang." });
+      }
+      throw error;
+    }
+
+    res.status(201).json({ id: profileId.toString(), ...item });
   } catch (error) {
     next(error);
   }
@@ -292,10 +457,22 @@ app.delete("/api/:type/:id", authenticate, async (req, res, next) => {
     }
     const id = parseId(req.params.id);
     const collection = await collectionFor(req.params.type);
+    const profile = await collection.findOne({ _id: id });
+    if (!profile) {
+      return res.status(404).json({ error: "Ma’lumot topilmadi" });
+    }
+
     const result = await collection.deleteOne({ _id: id });
 
     if (!result.deletedCount) {
       return res.status(404).json({ error: "Ma’lumot topilmadi" });
+    }
+
+    if (profile.userId) {
+      const currentDb = await ensureDb();
+      await currentDb.collection("users").deleteOne({
+        _id: new ObjectId(profile.userId)
+      });
     }
 
     res.json({ message: "Ma’lumot o‘chirildi" });
