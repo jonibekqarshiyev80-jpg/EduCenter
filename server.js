@@ -211,6 +211,73 @@ app.post("/api/login", async (req, res, next) => {
   }
 });
 
+app.post("/api/telegram/webhook", async (req, res, next) => {
+  try {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+    const siteUrl = process.env.SITE_URL;
+
+    if (!token || !webhookSecret || !siteUrl) {
+      return res.status(503).json({ error: "Telegram bot sozlanmagan." });
+    }
+
+    let parsedSiteUrl;
+    try {
+      parsedSiteUrl = new URL(siteUrl);
+    } catch {
+      return res.status(503).json({ error: "SITE_URL noto‘g‘ri sozlangan." });
+    }
+    if (parsedSiteUrl.protocol !== "https:") {
+      return res.status(503).json({ error: "SITE_URL HTTPS bo‘lishi kerak." });
+    }
+
+    const providedSecret = req.get("x-telegram-bot-api-secret-token") || "";
+    const expectedSecretBuffer = Buffer.from(webhookSecret);
+    const providedSecretBuffer = Buffer.from(providedSecret);
+    if (providedSecretBuffer.length !== expectedSecretBuffer.length ||
+        !crypto.timingSafeEqual(providedSecretBuffer, expectedSecretBuffer)) {
+      return res.sendStatus(401);
+    }
+
+    const message = req.body?.message;
+    const chatId = message?.chat?.id;
+    const command = typeof message?.text === "string"
+      ? message.text.trim().split(/\s+/, 1)[0].split("@", 1)[0].toLowerCase()
+      : "";
+
+    if (!chatId || !["/start", "/help", "/site"].includes(command)) {
+      return res.sendStatus(200);
+    }
+
+    const telegramResponse = await fetch(
+      `https://api.telegram.org/bot${token}/sendMessage`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: "EduCenter saytiga kirish uchun tugmani bosing. Tizim bo‘limlaridan foydalanish uchun login va parolingiz kerak bo‘ladi.",
+          reply_markup: {
+            inline_keyboard: [[{
+              text: "EduCenter saytini ochish",
+              web_app: { url: parsedSiteUrl.toString() }
+            }]]
+          }
+        })
+      }
+    );
+
+    if (!telegramResponse.ok) {
+      console.error(`Telegram sendMessage xatosi: HTTP ${telegramResponse.status}`);
+      return res.status(502).json({ error: "Telegram botga xabar yuborilmadi." });
+    }
+
+    return res.sendStatus(200);
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get("/api/auth/me", authenticate, (req, res) => {
   res.json({ user: req.user });
 });

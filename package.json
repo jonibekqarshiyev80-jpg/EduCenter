@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "telegram:webhook": "node scripts/set-telegram-webhook.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
